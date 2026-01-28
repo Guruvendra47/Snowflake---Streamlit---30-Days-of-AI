@@ -192,8 +192,3 @@ st.write(response)
 * 🔗 Snowflake Cortex LLM Functions
 * 🔗 COMPLETE Function Reference
 * 🔗 Available LLM Models
-
----
-
-```
-```
