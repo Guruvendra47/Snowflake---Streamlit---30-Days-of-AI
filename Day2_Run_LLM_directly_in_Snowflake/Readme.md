@@ -1,3 +1,3 @@
-# 🧠 Day 2 — Hello, Cortex!
+## 📅 Day 2 — Hello, Cortex!
 
 
