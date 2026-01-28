@@ -145,9 +145,9 @@ This confirms:
 
 ## 📚 References
 
-* [Streamlit in Snowflake Documentation]
-* [Streamlit Secrets Management]
-* [Snowpark Python API]
-* [Get started with Streamlit]
+* Streamlit in Snowflake Documentation
+* Streamlit Secrets Management
+* Snowpark Python API
+* Get started with Streamlit
 
 
