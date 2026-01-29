@@ -164,111 +164,210 @@ Respond to the user's latest message."""
 st.divider()
 st.caption("Day 14: Adding Avatars and Error Handling | 30 Days of AI")
 ```
+# 📘 Explanation:
 
----
+## 🧠 How It Works: Step-by-Step
 
-## 📘 Explanation
+Day 14 **keeps everything from previous days** and adds two production-grade features:
 
-### 🔍 How It Works: Step-by-Step
+* 🎭 **Custom avatars** (visual personalization)
+* 🚨 **Robust error handling** (stability & professionalism)
 
-Day 14 keeps everything from earlier days and adds **avatars** and **error handling**.
+This is where your chatbot stops feeling like a demo and starts feeling like a **real product**.
 
 ---
 
 ## ✅ What’s Kept from Previous Days
 
-* ⌨️ Streaming responses with custom generator (Day 12)
-* 🌀 Spinner showing **Processing** status (Day 12)
-* 🎭 System prompt customization (Day 13)
-* 🧠 Full conversation history (Day 11)
-* 📊 Sidebar with conversation stats (Day 11)
-* 🧹 Clear History button (Day 11)
-* 👋 Welcome message (Day 11)
-* 💬 Chat UI with `st.chat_message()` (Days 8–11)
+The following functionality is reused **unchanged**:
 
----
+* 🔁 **Streaming responses with custom generator** *(Day 12)*
+* ⏳ **Spinner showing “Processing” status** *(Day 12)*
+* 🎭 **System prompt customization** *(Day 13)*
+* 🧠 **Full conversation history** *(Day 11)*
+* 📊 **Sidebar with conversation stats** *(Day 11)*
+* 🧹 **Clear History button** *(Day 11)*
+* 👋 **Welcome message** *(Day 11)*
+* 💬 **Chat interface using `st.chat_message()`** *(Days 8–11)*
+
+> 📌 **Brutal mentor note**: This proves architectural discipline — features are layered, not hacked in.
 
 ## 🆕 What’s New: Avatars & Error Handling
 
+
 ### 1️⃣ Avatar Configuration
 
-* 👤 Users select their own avatar
-* 🤖 Assistant avatar is independently configurable
-* 🎨 Uses emojis for simplicity and clarity
+```python
+USER_AVATAR = ":material_account_circle:"
+ASSISTANT_AVATAR = ":material_smart_toy:"
+
+user_avatar = st.selectbox(
+    "Your Avatar:",
+    [":material_account_circle:", "🧑‍💻", "👨‍🎓", "👩‍🔬", "🦸", "🧙"],
+    index=0
+)
+```
+
+### 🔍 Why this matters
+
+* 🎨 **Default avatars**: Constants ensure consistent styling
+* 🧍 **User choice**: Users personalize their chat experience
+* 🤖 **Both avatars**: User and assistant avatars are independent
+
+> ⚠️ **Brutal truth**: UX polish matters. Interviewers notice this immediately.
 
 ---
 
 ### 2️⃣ Debug Mode Toggle
 
-* 🐞 Checkbox to simulate API failures
-* 🧪 Makes error handling easy to test
-* ❌ Disabled by default
+```python
+st.subheader(":material_bug_report: Debug Mode")
+simulate_error = st.checkbox(
+    "Simulate API Error",
+    value=False,
+    help="Enable this to test the error handling mechanism"
+)
+```
+
+### 🔍 Why this matters
+
+* 🧪 **Testing tool**: Trigger failures without waiting for real ones
+* 🎓 **Educational value**: Demonstrates resilience clearly
+* 🔕 **Default OFF**: Normal behavior unless testing
+* 💬 **Help text**: Explains purpose to users
+
+> 💡 **Interview line**: “We built a debug toggle to validate error handling paths safely.”
 
 ---
 
 ### 3️⃣ Using Avatars in Chat Messages
 
-* Avatars are dynamically chosen based on message role
-* Passed via `avatar=` parameter in `st.chat_message()`
+```python
+for message in st.session_state.messages:
+    avatar = user_avatar if message["role"] == "user" else assistant_avatar
+    with st.chat_message(message["role"], avatar=avatar):
+        st.markdown(message["content"])
+```
+
+### 🔍 Why this matters
+
+* 🔄 **Dynamic avatar selection**: Based on message role
+* 🧩 `avatar=` parameter:
+
+  * Emojis
+  * Image URLs
+  * Image file paths
+
+> 📌 **Brutal clarity**: This is presentation logic — cleanly separated from LLM logic.
 
 ---
 
-### 4️⃣ Error Handling with `try / except`
+### 4️⃣ Error Handling with `try / except` and Streaming
 
-* Wraps the entire streaming logic
-* Catches API, network, or runtime failures
-* Displays friendly error messages
-* Prevents the app from crashing
+```python
+try:
+    # Simulate error if debug mode is enabled
+    if simulate_error:
+        raise Exception("Simulated API error: Service temporarily unavailable (429)")
+
+    # Custom generator for reliable streaming
+    def stream_generator():
+        # Build the full conversation history for context
+        conversation = "\n\n".join([
+            f"{'User' if msg['role'] == 'user' else 'Assistant'}: {msg['content']}"
+            for msg in st.session_state.messages
+        ])
+        full_prompt = f"{conversation}\n\nAssistant:"
+
+        response_text = call_llm(full_prompt)
+        for word in response_text.split():
+            yield word + " "
+            time.sleep(0.02)
+
+    with st.spinner("Processing"):
+        response = st.write_stream(stream_generator)
+
+    st.session_state.messages.append({"role": "assistant", "content": response})
+
+except Exception as e:
+    error_message = f"I encountered an error: {str(e)}"
+    st.error(error_message)
+    st.info(":material_lightbulb: **Tip:** This might be a temporary issue. Try again in a moment, or rephrase your question.")
+```
+
+### 🔍 Why this matters
+
+* 🛡️ **`try / except` block**: Catches API, network, or logic failures
+* 🧪 **Simulated error**: Controlled testing via debug mode
+* 🔴 `st.error()`:
+
+  * Red error box
+  * Clear failure message
+* 🔵 `st.info()`:
+
+  * Helpful guidance
+  * Preserves user trust
+* 🔁 **Custom generator**: Streaming remains intact
+* ⏳ **Spinner wrapper**: Visual feedback during processing
+
+> ⚠️ **Brutal truth**: No error handling = amateur app. Period.
 
 ---
 
-### 5️⃣ Why Error Handling Matters
+## 5️⃣ Why Error Handling Matters (Non-Negotiable)
 
-In production, **LLM APIs will fail**.
+🚨 **LLM APIs WILL fail in production.**
 
-Common reasons:
+Common failure reasons:
 
-* ⏱️ Rate limits
-* 🌐 Network issues
-* 🧠 Model overload
-* 🚫 Invalid or restricted prompts
+* ⛔ **Rate limiting** — too many requests
+* 🌐 **Network issues** — transient outages
+* 🧠 **Model overload** — high demand timeouts
+* 🚫 **Invalid input** — safety or validation errors
 
-Good error handling:
+### By handling errors gracefully, we:
 
-* Keeps the app running
-* Maintains user trust
-* Provides clear guidance
+* ✅ Prevent app crashes
+* 📢 Keep users informed
+* 🧭 Provide actionable suggestions
+* 🧹 Avoid storing failed responses in history
+
+> 🧠 **Burn this in memory**: Stability is a feature.
 
 ---
 
-## 🖥️ Final Result
+## 🚀 Final Result
 
-When this code runs, you will have:
+When this code runs, you get:
 
-* 🎭 A visually polished chatbot
-* 🧑‍💻 Custom avatars for user and assistant
-* 🛡️ Graceful error handling
-* 🧪 A debug mode for testing failures
+* 🎭 A **visually polished chatbot** with avatars
+* 🚨 **Robust error handling**
+* 🧪 A **debug mode** for testing failures
+* 💼 A professional, production-ready UX
 
 ---
 
 ## 🧪 Try It Out
 
-1. Enable **Simulate API Error** in the sidebar
+1. Enable **“Simulate API Error”** in the sidebar
 2. Send a message
 3. Observe:
 
-   * 🔴 Error message
+   * 🔴 Red error message
    * 💡 Helpful tip
    * ✅ App continues running
+4. Disable the checkbox and retry
 
-Disable the toggle and try again for normal operation.
+> 📌 **Key point**: The app fails gracefully — it does NOT crash.
 
 ---
 
 ## 📚 Resources
 
-* 📘 **st.chat_message Avatar Parameter**
-* 📘 **st.error Documentation**
-* 📘 **Python Exception Handling**
+* 📘 `st.chat_message` Avatar Parameter
+* 📕 `st.error` Documentation
+* 🧠 Python Exception Handling
+
+
+
 
