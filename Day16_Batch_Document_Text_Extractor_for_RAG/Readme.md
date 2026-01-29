@@ -667,5 +667,293 @@ st.divider()
 st.caption("Day 16: Batch Document Text Extractor for RAG | 30 Days of AI")
 ```
 
+## 📥 Download Sample Review Data
+
+To get started quickly, download the **sample dataset of 100 customer reviews** from *Avalanche winter sports equipment*.
+
+* 📦 **File**: `review.zip`
+* 📄 **Contents**: 100 TXT review files
+
+### 🧭 How to Use
+
+1. Click the **Download** link to get `review.zip`
+2. Unzip the file on your computer
+3. You will see files named:
+
+   * `review-001.txt` → `review-100.txt`
+4. Open the app and use **Upload Documents**
+5. Select **all 100 files at once**
+6. Click **Extract Text** to process and save them to Snowflake
+
+> 💡 **Tip**: Upload all 100 files together to see true **batch processing** in action.
+
+---
+
+## 📦 What’s Included in the Sample Data
+
+* ✅ 100 customer review files (TXT format)
+* ✅ Each review contains:
+
+  * Product name
+  * Review date
+  * Review summary
+  * Sentiment score
+  * Order ID
+
+🎯 **Perfect for**:
+
+* Batch ingestion testing
+* RAG document pipelines
+* Chunking & embedding demos (Day 17+)
+
+---
+
+## 🧠 How It Works: Step-by-Step
+
+Let’s break down **exactly** what each part of the code does.
+
+
+## 1️⃣ Database Configuration and Session State
+
+```python
+import streamlit as st
+from pypdf import PdfReader
+import io
+
+# Connect to Snowflake
+try:
+    # Works in Streamlit in Snowflake
+    from snowflake.snowpark.context import get_active_session
+    session = get_active_session()
+except:
+    # Works locally and on Streamlit Community Cloud
+    from snowflake.snowpark import Session
+    session = Session.builder.configs(st.secrets["connections"]["snowflake"]).create()
+
+# Initialize session state for persistence
+if 'database' not in st.session_state:
+    st.session_state.database = "RAG_DB"
+    st.session_state.schema = "RAG_SCHEMA"
+    st.session_state.table_name = "EXTRACTED_DOCUMENTS"
+```
+
+### 🔍 Explanation
+
+* `streamlit` → UI framework
+* `PdfReader` → PDF text extraction
+* `try / except` → Environment-aware Snowflake connection
+* `session` → Active Snowflake session used everywhere
+* **Session state init** → Database, schema, and table persist across reruns
+
+> ⚠️ **Brutal truth**: If you don’t persist config in session state, your app will fight itself.
+
+---
+
+## 2️⃣ Batch File Upload
+
+```python
+uploaded_files = st.file_uploader(
+    "Choose file(s)",
+    type=["txt", "md", "pdf"],
+    accept_multiple_files=True,
+    help="Supported formats: TXT, MD, PDF. Upload multiple files at once!"
+)
+
+if uploaded_files:
+    st.success(f":material_check_circle: {len(uploaded_files)} file(s) uploaded")
+```
+
+### 🔍 Why this matters
+
+* `accept_multiple_files=True` → **True batch uploads**
+* File type restriction → Prevents invalid formats
+* `uploaded_files` → List of file objects
+* Status message → Confirms batch size
+
+---
+
+## 3️⃣ Process Button and Progress Tracking
+
+```python
+process_button = st.button(
+    f":material_sync: Extract Text from {len(uploaded_files)} File(s)",
+    type="primary",
+    use_container_width=True
+)
+
+if process_button:
+    success_count = 0
+    error_count = 0
+    extracted_data = []
+
+    progress_bar = st.progress(0, text="Starting extraction...")
+    status_container = st.empty()
+```
+
+### 🔍 Why this matters
+
+* Dynamic button label → Shows workload size
+* `type="primary"` → Clear call-to-action
+* Scoped variables → Only exist after click
+* Progress UI → Real-time feedback
+
+---
+
+## 4️⃣ Replace Table Mode (Critical)
+
+```python
+try:
+    result = session.sql(f"SELECT COUNT(*) FROM {full_table_name}").collect()
+    table_exists = True
+except:
+    table_exists = False
+
+replace_mode = st.checkbox(
+    f":material_sync: Replace Table Mode for `{st.session_state.table_name}`",
+    value=table_exists,
+    help=f"When enabled, replaces all existing data in {full_table_name}"
+)
+```
+
+### 🔍 Why this matters
+
+* Smart default behavior
+* Replace = destructive
+* Append = additive
+
+> 🔥 **Brutal rule**: Never ingest blindly. Always know if you’re deleting data.
+
+---
+
+## 5️⃣ Extract Text from Files
+
+```python
+for idx, uploaded_file in enumerate(uploaded_files):
+    progress_pct = (idx + 1) / len(uploaded_files)
+    progress_bar.progress(progress_pct, text=f"Processing {idx+1}/{len(uploaded_files)}: {uploaded_file.name}")
+
+    if uploaded_file.name.lower().endswith(('.txt', '.md')):
+        extracted_text = uploaded_file.read().decode("utf-8")
+    elif uploaded_file.name.lower().endswith('.pdf'):
+        pdf_reader = PdfReader(io.BytesIO(uploaded_file.read()))
+        extracted_text = ""
+        for page in pdf_reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                extracted_text += page_text + "\n\n"
+```
+
+### 🔍 Why this matters
+
+* `enumerate()` → Index + file
+* `.endswith()` → Reliable file detection
+* UTF-8 decoding → Text safety
+* Page-by-page PDF extraction
+
+---
+
+## 6️⃣ Handle Replace Mode
+
+```python
+if replace_mode:
+    try:
+        session.sql(f"TRUNCATE TABLE {full_table_name}").collect()
+    except:
+        pass
+```
+
+### 🔍 Why this matters
+
+* `TRUNCATE` → Fast bulk deletion
+* Keeps schema intact
+* Safe when table doesn’t exist
+
+---
+
+## 7️⃣ Save to Snowflake
+
+```python
+session.sql(f"CREATE DATABASE IF NOT EXISTS {st.session_state.database}").collect()
+session.sql(f"CREATE SCHEMA IF NOT EXISTS {st.session_state.database}.{st.session_state.schema}").collect()
+```
+
+```sql
+CREATE TABLE IF NOT EXISTS ... (
+  DOC_ID NUMBER AUTOINCREMENT,
+  FILE_NAME VARCHAR,
+  FILE_TYPE VARCHAR,
+  FILE_SIZE NUMBER,
+  EXTRACTED_TEXT VARCHAR,
+  UPLOAD_TIMESTAMP TIMESTAMP_NTZ,
+  WORD_COUNT NUMBER,
+  CHAR_COUNT NUMBER
+)
+```
+
+### 🔍 Why this schema matters
+
+* `AUTOINCREMENT` → Unique document IDs
+* `EXTRACTED_TEXT` → Full document content
+* Timestamp + metadata → Auditability
+
+---
+
+## 8️⃣ Query and View Saved Documents
+
+```python
+if st.button(":material_analytics: Query Table"):
+    df = session.sql(f"SELECT * FROM {full_table_name}").to_pandas()
+    st.session_state.queried_docs = df
+    st.rerun()
+```
+
+### 🔍 Why this matters
+
+* Confirms ingestion worked
+* Full-text inspection
+* Session state prevents data loss on rerun
+
+---
+
+## 9️⃣ Integration with Day 17 (RAG Chunking)
+
+```python
+st.session_state.rag_source_table = f"{database}.{schema}.{table_name}"
+st.session_state.rag_source_database = database
+st.session_state.rag_source_schema = schema
+```
+
+### Why this matters
+
+* 🔁 Seamless handoff to Day 17
+* 🧠 No reconfiguration needed
+* 📦 All batches merge into one corpus
+
+---
+
+## 🎯 Final Outcome
+
+After this step, you have:
+
+* ✅ Batch document ingestion
+* ✅ Clean extracted text
+* ✅ Persistent Snowflake storage
+* ✅ Metadata-rich table
+* ✅ **RAG-ready corpus**
+
+🔥 **Brutal takeaway**:
+
+> If EXTRACTED_TEXT is wrong, everything downstream is wrong. Fix ingestion first.
+
+---
+
+## 📚 Resources
+
+* 📘 `st.file_uploader` Documentation
+* 📘 `pypdf` Documentation
+* 📘 Snowflake `AUTOINCREMENT`
+* 📘 Streamlit Session State Management
+
+
 
 
