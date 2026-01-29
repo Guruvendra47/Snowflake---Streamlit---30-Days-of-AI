@@ -498,12 +498,293 @@ with st.container(border=True):
 st.divider()
 st.caption("Day 17: Loading and Transforming Customer Reviews for RAG | 30 Days of AI")
 ```
+# 📘 Explanation
+
+## 🧠 How It Works: Step‑by‑Step
+
+Day 17 sits **between ingestion (Day 16)** and **embeddings (Day 18)**.
+
+🎯 **Purpose**:
+
+* Take extracted documents from Day 16
+* Convert them into **well-sized text chunks**
+* Preserve context
+* Store chunks in Snowflake for embedding generation
+
+> ⚠️ **Brutal mentor truth**: Chunking quality matters more than embedding model choice.
 
 ---
 
-.
+## 1️⃣ Load Reviews from Day 16
+
+```python
+import streamlit as st
+import pandas as pd
+
+# Connect to Snowflake
+try:
+    # Works in Streamlit in Snowflake
+    from snowflake.snowpark.context import get_active_session
+    session = get_active_session()
+except:
+    # Works locally and on Streamlit Community Cloud
+    from snowflake.snowpark import Session
+    session = Session.builder.configs(st.secrets["connections"]["snowflake"]).create()
+```
+
+### Session State Integration
+
+```python
+if 'day17_database' not in st.session_state:
+    if 'rag_source_database' in st.session_state:
+        st.session_state.day17_database = st.session_state.rag_source_database
+        st.session_state.day17_schema = st.session_state.rag_source_schema
+    else:
+        st.session_state.day17_database = "RAG_DB"
+        st.session_state.day17_schema = "RAG_SCHEMA"
+```
+
+### Why this matters
+
+* 🔁 Automatically reuses **Day 16 output**
+* 🧠 No hard‑coding of database/schema
+* 🔄 Falls back to defaults if Day 16 was skipped
+
+### Load Button
+
+```python
+if st.button(":material_folder_open: Load Reviews", type="primary"):
+    query = f"""
+    SELECT
+        DOC_ID, FILE_NAME, FILE_TYPE, EXTRACTED_TEXT,
+        UPLOAD_TIMESTAMP, WORD_COUNT, CHAR_COUNT
+    FROM {st.session_state.day17_database}.{st.session_state.day17_schema}.{st.session_state.day17_table_name}
+    ORDER BY FILE_NAME
+    """
+    df = session.sql(query).to_pandas()
+    st.session_state.loaded_data = df
+    st.rerun()
+```
+
+* 📥 Loads all documents from Snowflake
+* 🔄 `.to_pandas()` enables Python‑side processing
+* ⚡ `st.rerun()` refreshes UI immediately
 
 ---
 
-**Next Step:** Day 18 — Generating Embeddings and Vector Search
+## 2️⃣ Choose Processing Strategy
+
+```python
+processing_option = st.radio(
+    "Select processing strategy:",
+    ["Keep each review as a single chunk (Recommended)",
+     "Chunk reviews longer than threshold"],
+    index=0
+)
+```
+
+### Strategy Options
+
+#### ✅ Option 1 — One Review = One Chunk (Default)
+
+* Best for **short documents** (reviews)
+* Maximum semantic coherence
+* Simplest mental model
+
+#### 🔪 Option 2 — Split Long Reviews
+
+```python
+chunk_size = st.slider("Chunk Size (words):", 50, 500, 200, 50)
+overlap = st.slider("Overlap (words):", 0, 100, 50, 10)
+```
+
+* 📏 Chunk size → max words per chunk
+* 🔁 Overlap → preserves context across boundaries
+
+> 💡 **Rule of thumb**: No overlap = context loss.
+
+---
+
+## 3️⃣ Create Chunks from Reviews
+
+### Option 1: Full Review as One Chunk
+
+```python
+for idx, row in df.iterrows():
+    chunks.append({
+        'chunk_id': idx + 1,
+        'doc_id': row['DOC_ID'],
+        'file_name': row['FILE_NAME'],
+        'chunk_text': row['EXTRACTED_TEXT'],
+        'chunk_size': row['WORD_COUNT'],
+        'chunk_type': 'full_review'
+    })
+```
+
+* 📦 1 document → 1 chunk
+* 🧠 Full context retained
+
+### Option 2: Split with Overlap
+
+```python
+words = row['EXTRACTED_TEXT'].split()
+if len(words) > chunk_size:
+    for i in range(0, len(words), chunk_size - overlap):
+        chunk_words = words[i:i + chunk_size]
+        chunk_text = ' '.join(chunk_words)
+        chunks.append({
+            'chunk_id': len(chunks) + 1,
+            'chunk_text': chunk_text,
+            'chunk_size': len(chunk_words),
+            'chunk_type': 'split_chunk'
+        })
+```
+
+### Overlap Math
+
+* `chunk_size = 200`
+* `overlap = 50`
+* Step size = **150 words**
+
+➡️ Last 50 words of one chunk = first 50 of next
+
+> ⚠️ **Brutal truth**: Overlap is not optional for long text.
+
+---
+
+## 4️⃣ Check if Chunk Table Exists
+
+```python
+try:
+    result = session.sql(f"SELECT COUNT(*) as count FROM {full_chunk_table}").collect()
+    record_count = result[0]['COUNT']
+    chunk_table_exists = record_count > 0
+except:
+    chunk_table_exists = False
+```
+
+* 🧪 Safe existence check
+* ❌ Query fails → table doesn’t exist
+* ✅ Used to drive replace‑mode defaults
+
+---
+
+## 5️⃣ Replace Mode for Chunks
+
+```python
+replace_mode = st.checkbox(
+    f":material_sync: Replace Table Mode for `{st.session_state.day17_chunk_table}`",
+    key="day17_replace_mode"
+)
+```
+
+### Why this matters
+
+* 🔁 Prevents accidental duplication
+* 🧠 Smart defaults based on table state
+* 🔄 Resets when table name changes
+
+> 🔥 **Brutal rule**: You must always know if you’re overwriting data.
+
+---
+
+## 6️⃣ Save Chunks to Snowflake
+
+### Chunk Table Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS ... (
+    CHUNK_ID NUMBER,
+    DOC_ID NUMBER,
+    FILE_NAME VARCHAR,
+    CHUNK_TEXT VARCHAR,
+    CHUNK_SIZE NUMBER,
+    CHUNK_TYPE VARCHAR,
+    CREATED_TIMESTAMP TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+)
+```
+
+### Writing Data
+
+```python
+session.write_pandas(
+    chunks_df_upper,
+    table_name=chunk_table,
+    database=database,
+    schema=schema,
+    overwrite=replace_mode
+)
+```
+
+* ⚡ Bulk insert (fast)
+* 🔠 Uppercase columns (Snowflake standard)
+* 🔁 Replace or append safely
+
+---
+
+## 7️⃣ Query Saved Chunks
+
+```python
+SELECT CHUNK_ID, FILE_NAME, CHUNK_SIZE, CHUNK_TYPE,
+       LEFT(CHUNK_TEXT, 100) AS TEXT_PREVIEW
+FROM {full_chunk_table}
+```
+
+* 👀 Preview chunks without flooding UI
+* 📋 Confirms chunk integrity
+
+---
+
+## 8️⃣ View Full Chunk Text
+
+* 🎯 Select chunk ID
+* 📖 Load full text
+* 🧪 Verify correctness before embeddings
+
+```python
+st.text_area("Full Chunk Text", value=chunk_text, height=300)
+```
+
+---
+
+## 9️⃣ Integration with Day 18 (Embeddings)
+
+```python
+st.session_state.chunks_table = f"{database}.{schema}.{chunk_table}"
+st.session_state.chunks_database = database
+st.session_state.chunks_schema = schema
+```
+
+### Why this matters
+
+* 🔗 Seamless handoff
+* ⚙️ Zero configuration tomorrow
+* 🧠 Ready for vectorization
+
+---
+
+## 🎯 Final Result
+
+After Day 17, you have:
+
+* ✅ Clean, consistent chunks
+* ✅ Context‑preserving overlap
+* ✅ Traceability to source documents
+* ✅ Snowflake‑backed chunk storage
+* ✅ Perfect input for embeddings
+
+🔥 **Final brutal takeaway**:
+
+> Chunking decides whether RAG works. Embeddings only amplify your chunking quality.
+
+---
+
+## 📚 Resources
+
+* 📘 Snowpark DataFrames
+* 📘 `write_pandas` Documentation
+* 📘 Text Chunking Best Practices
+
+
+
 
