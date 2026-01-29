@@ -13,7 +13,7 @@ Once that's done, we will display the AI's answer directly in the web app.
 
 ---
 
-## 🧪 See the code:
+## 🧪 Code:
 
 ```python
 import streamlit as st
@@ -57,7 +57,8 @@ if st.button("Submit"):
 # Footer
 st.divider()
 st.caption("Day 4: Caching your App | 30 Days of AI")
-📖 See the explanation
+---
+📖 Explanation
 🧩 How It Works: Step-by-Step
 Let's break down what each part of the code does.
 
