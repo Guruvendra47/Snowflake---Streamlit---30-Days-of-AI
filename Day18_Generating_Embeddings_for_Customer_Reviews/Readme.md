@@ -774,7 +774,7 @@ if 'queried_embeddings' in st.session_state:
 
 ### 📌 Explanation
 
-* 🔹 Select CHUNK_ID
+* Select CHUNK_ID
 * Load full 768‑dimension vector
 * Handles string, list, and numpy formats
 * Displays readable Python list
