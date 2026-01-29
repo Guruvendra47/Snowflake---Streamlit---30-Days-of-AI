@@ -500,9 +500,11 @@ st.caption("Day 18: Generating Embeddings for Customer Reviews | 30 Days of AI")
 # 📘 Explanation
 
 
-## 🎯 How It Works: Step-by-Step
-Let's break down what each part of the code does.
+## 🧠 How It Works: Step‑by‑Step
 
+Let’s break down what each part of the code does.
+
+---
 
 ## 1️⃣ Load Chunks from Day 17
 
@@ -511,22 +513,18 @@ import streamlit as st
 from snowflake.cortex import embed_text_768
 import pandas as pd
 import json
-```
 
-### Snowflake Connection
-
-```python
+# Connect to Snowflake
 try:
+    # Works in Streamlit in Snowflake
     from snowflake.snowpark.context import get_active_session
     session = get_active_session()
 except:
+    # Works locally and on Streamlit Community Cloud
     from snowflake.snowpark import Session
     session = Session.builder.configs(st.secrets["connections"]["snowflake"]).create()
-```
 
-### Session State Integration
-
-```python
+# Initialize with Day 17's table location
 if 'day18_database' not in st.session_state:
     if 'chunks_database' in st.session_state:
         st.session_state.day18_database = st.session_state.chunks_database
@@ -534,20 +532,11 @@ if 'day18_database' not in st.session_state:
     else:
         st.session_state.day18_database = "RAG_DB"
         st.session_state.day18_schema = "RAG_SCHEMA"
-```
 
-**Why this matters**
-
-* 🔁 Automatically picks up Day 17 output
-* ❌ No hard‑coding
-* 🧠 Safe defaults
-
-### Load Button
-
-```python
 if st.button(":material_folder_open: Load Chunks", type="primary"):
     query = f"""
-    SELECT CHUNK_ID, DOC_ID, FILE_NAME, CHUNK_TEXT, CHUNK_SIZE, CHUNK_TYPE
+    SELECT
+        CHUNK_ID, DOC_ID, FILE_NAME, CHUNK_TEXT, CHUNK_SIZE, CHUNK_TYPE
     FROM {st.session_state.day18_database}.{st.session_state.day18_schema}.{st.session_state.day18_chunk_table}
     ORDER BY CHUNK_ID
     """
@@ -556,161 +545,243 @@ if st.button(":material_folder_open: Load Chunks", type="primary"):
     st.rerun()
 ```
 
-* 📥 Pulls all chunks
-* 🔄 Converts to Pandas for Python processing
-* ⚡ `st.rerun()` refreshes UI immediately
+### 📌 Explanation (unchanged)
+
+* 🔹 `from snowflake.cortex import embed_text_768`: Imports the Cortex function that generates **768‑dimensional embeddings**.
+* 🔹 **Session state integration**: Automatically detects the chunk table location from Day 17's `chunks_database` and `chunks_schema`.
+* 🔹 **Load button**: Queries all chunks from Day 17's table using `SELECT`.
+* 🔹 `st.rerun()`: Forces an immediate refresh to display the loaded chunks.
 
 ---
 
-## 2️⃣ Generate Embeddings (Batch Processing)
+## 2️⃣ Generate Embeddings with Batch Processing
 
 ```python
 batch_size = st.selectbox("Batch Size", [10, 25, 50, 100], index=1)
+
+if st.button(":material_calculate: Generate Embeddings", type="primary"):
+    embeddings = []
+    total_chunks = len(df)
+
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
+    for i in range(0, total_chunks, batch_size):
+        batch_end = min(i + batch_size, total_chunks)
+        status_text.text(f"Processing chunks {i+1} to {batch_end} of {total_chunks}")
+
+        for idx, row in df.iloc[i:batch_end].iterrows():
+            emb = embed_text_768(
+                model='snowflake-arctic-embed-m',
+                text=row['CHUNK_TEXT']
+            )
+            embeddings.append({
+                'chunk_id': row['CHUNK_ID'],
+                'embedding': emb
+            })
+
+        progress_pct = batch_end / total_chunks
+        progress_bar.progress(progress_pct)
+
+    st.session_state.embeddings_data = embeddings
 ```
 
-### Why batching exists
+### 📌 Explanation
 
-* ⚡ Prevents timeouts
-* 🧠 Controls memory usage
-* 🔁 Scales cleanly
-
-### Core Embedding Call
-
-```python
-emb = embed_text_768(
-    model='snowflake-arctic-embed-m',
-    text=row['CHUNK_TEXT']
-)
-```
-
-* `embed_text_768` → Cortex embedding function
-* Model outputs **768‑dimensional vectors**
-* Same text → same vector
-* Similar meaning → closer vectors
-
-> 🔥 **Brutal truth**: Bad chunking = bad embeddings. The model can’t fix your mistakes.
-
-### Progress Tracking
-
-* `st.progress()` shows completion
-* `status_text` shows current batch
-
-Embeddings are stored in:
-
-```python
-st.session_state.embeddings_data
-```
+* 🔹 **Batch size selection**: Lets users process chunks in batches of 10, 25, 50, or 100 for better performance control.
+* 🔹 **Progress tracking**: Creates a progress bar and status text to show processing status in real‑time.
+* 🔹 `embed_text_768(...)`: Core Cortex function converting text into a **768‑dimensional vector** using `snowflake-arctic-embed-m`.
+* 🔹 **Embedding structure**: Returns a list of 768 floating‑point numbers representing semantic meaning.
+* 🔹 **Storage**: Embeddings are stored in session state as `{chunk_id, embedding}`.
 
 ---
 
 ## 3️⃣ View Generated Embeddings
 
 ```python
-st.metric("Embeddings Generated", len(embeddings))
-st.metric("Dimensions per Embedding", 768)
+if 'embeddings_data' in st.session_state:
+    with st.container(border=True):
+        st.subheader(":material_looks_3: View Embeddings")
+
+        embeddings = st.session_state.embeddings_data
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Embeddings Generated", len(embeddings))
+        with col2:
+            st.metric("Dimensions per Embedding", 768)
+
+        # Show sample embedding
+        with st.expander(":material_search: View Sample Embedding"):
+            sample_emb = embeddings[0]['embedding']
+            st.write("**First 10 values:**")
+            st.write(sample_emb[:10])
 ```
 
-### Sample Preview
+### 📌 Explanation 
 
-```python
-st.write(sample_emb[:10])
-```
-
-**Why this step matters**
-
-* ✅ Confirms embeddings exist
-* ✅ Confirms dimensionality
-* ❌ Skipping this = blind debugging later
+* 🔹 Container structure wraps the preview section.
+* 🔹 Metrics confirm embedding count and dimensionality.
+* 🔹 Sample preview shows the first 10 vector values.
+* 🔹 Verification ensures embeddings exist **before saving**.
 
 ---
 
 ## 4️⃣ Save Embeddings to Snowflake
 
-### Table Status Check
+```python
+# Table status check
+try:
+    check_query = f"""
+    SELECT COUNT(*) as count
+    FROM {full_embedding_table}
+    """
+    result = session.sql(check_query).collect()
+    current_count = result[0]['COUNT']
 
-```sql
-SELECT COUNT(*) FROM embedding_table
+    if current_count > 0:
+        st.warning(f":material_warning: **{current_count:,} embedding(s)** currently in table")
+        embedding_table_exists = True
+    else:
+        st.info(":material_inbox: **Embedding table is empty**")
+        embedding_table_exists = False
+except:
+    st.info(":material_inbox: **Embedding table doesn't exist yet**")
+    embedding_table_exists = False
 ```
 
-Used to decide **Replace vs Append** mode.
+### 📌 Explanation 
 
-### Replace Mode Checkbox
+* 🔹 Checks whether the embeddings table exists.
+* 🔹 Displays record count if present.
+* 🔹 Drives **Replace vs Append** behavior.
+
+---
+
+## 5️⃣ View Saved Embeddings
+
+```sql
+# View Saved Embeddings Section
+with st.container(border=True):
+    st.subheader(":material_search: View Saved Embeddings")
+
+    # Check if embeddings table exists and show record count
+    try:
+        count_result = session.sql(f"""
+            SELECT COUNT(*) as CNT FROM {full_embedding_table}
+        """).collect()
+
+        if count_result:
+            record_count = count_result[0]['CNT']
+            if record_count > 0:
+                st.warning(f":material_warning: **{record_count:,} embedding(s)** currently in table")
+            else:
+                st.info(":material_inbox: **Embedding table is empty**")
+    except:
+        st.info(":material_inbox: **Embedding table doesn't exist yet**")
+
+    query_button = st.button(":material_analytics: Query Embedding Table", type="secondary")
+
+    if query_button:
+        query = f"""
+        SELECT 
+            CHUNK_ID,
+            EMBEDDING,
+            CREATED_TIMESTAMP,
+            VECTOR_L2_DISTANCE(EMBEDDING, EMBEDDING) as SELF_DISTANCE
+        FROM {full_embedding_table}
+        ORDER BY CHUNK_ID
+        """
+        result_df = session.sql(query).to_pandas()
+        st.session_state.queried_embeddings = result_df
+        st.session_state.queried_embeddings_table = full_embedding_table
+        st.rerun()
+```
+
+### 📌 Explanation
+
+* 🔹 Self‑distance must always be **0**.
+* 🔹 Confirms embeddings are stored correctly.
+
+---
+
+## 6️⃣ View Individual Embedding Vectors
 
 ```python
-replace_mode = st.checkbox(
-    f":material_sync: Replace Table Mode",
-    key="day18_replace_mode"
-)
+# Display results if available in session state
+if 'queried_embeddings' in st.session_state:
+    emb_df = st.session_state.queried_embeddings
+
+    if len(emb_df) > 0:
+        # Summary metrics
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Total Embeddings", len(emb_df))
+        with col2:
+            st.metric("Dimensions", "768")
+
+        # Display table without EMBEDDING column
+        embedding_col = None
+        for col in emb_df.columns:
+            if col.upper() == 'EMBEDDING':
+                embedding_col = col
+                break
+
+        if embedding_col:
+            display_df = emb_df.drop(columns=[embedding_col])
+        else:
+            display_df = emb_df
+
+        st.dataframe(display_df, use_container_width=True)
+        st.info(":material_lightbulb: Self-distance should be 0, confirming embeddings are stored correctly")
+
+        # View individual embedding vectors
+        if embedding_col:
+            with st.expander(":material_search: View Individual Embedding Vectors"):
+                # Find CHUNK_ID column (case-insensitive)
+                chunk_id_col = None
+                for col in emb_df.columns:
+                    if col.upper() == 'CHUNK_ID':
+                        chunk_id_col = col
+                        break
+
+                chunk_ids = emb_df[chunk_id_col].tolist()
+                selected_chunk = st.selectbox("Select CHUNK_ID", chunk_ids, key="view_embedding_chunk")
+
+                if st.button(":material_analytics: Load Embedding Vector", key="load_embedding_btn"):
+                    selected_emb = emb_df[emb_df[chunk_id_col] == selected_chunk][embedding_col].iloc[0]
+                    st.session_state.loaded_embedding = selected_emb
+                    st.session_state.loaded_embedding_chunk = selected_chunk
+                    st.rerun()
+
+                # Display loaded embedding
+                if 'loaded_embedding' in st.session_state:
+                    st.write(f"**Embedding Vector for CHUNK_ID {st.session_state.loaded_embedding_chunk}:**")
+
+                    # Convert to list if needed
+                    emb_vector = st.session_state.loaded_embedding
+                    if isinstance(emb_vector, str):
+                        import json
+                        emb_vector = json.loads(emb_vector)
+                    elif hasattr(emb_vector, 'tolist'):
+                        emb_vector = emb_vector.tolist()
+                    elif not isinstance(emb_vector, list):
+                        emb_vector = list(emb_vector)
+
+                    st.caption(f"Vector length: {len(emb_vector)} dimensions")
+                    st.code(emb_vector, language="python")
 ```
 
-* 🔄 Replace → full rebuild
-* ➕ Append → incremental updates
+### 📌 Explanation
 
-> ⚠️ **Brutal rule**: Never mix embeddings from different chunking strategies.
+* 🔹 Select CHUNK_ID
+* 🔹 Load full 768‑dimension vector
+* 🔹 Handles string, list, and numpy formats
+* 🔹 Displays readable Python list
 
 ---
 
-## 5️⃣ VECTOR Table Schema
-
-```sql
-CREATE TABLE IF NOT EXISTS embedding_table (
-  CHUNK_ID NUMBER,
-  EMBEDDING VECTOR(FLOAT, 768),
-  CREATED_TIMESTAMP TIMESTAMP_NTZ
-)
-```
-
-### Why VECTOR Matters
-
-* 🚀 Optimized for similarity search
-* 🧠 Required for Cortex Search
-
----
-
-## 6️⃣ Insert Embeddings Correctly (Critical)
-
-```sql
-INSERT INTO table (CHUNK_ID, EMBEDDING)
-SELECT id, '[...]'::VECTOR(FLOAT, 768)
-```
-
-### Why this syntax is required
-
-* ❌ `VALUES (...)` **does NOT work** for VECTOR
-* ✅ `SELECT ... ::VECTOR` ensures correct casting
-
-> 🔥 This is one of the **most common Snowflake VECTOR mistakes**.
-
----
-
-## 7️⃣ Query & Validate Embeddings
-
-```sql
-VECTOR_L2_DISTANCE(EMBEDDING, EMBEDDING)
-```
-
-* Always returns **0**
-* Confirms vectors stored correctly
-
-If it’s not 0 → **something is wrong**.
-
----
-
-## 8️⃣ View Individual Embedding Vectors
-
-* Select CHUNK_ID
-* Load full 768‑dimensional vector
-* Convert safely from string / array
-
-```python
-st.code(emb_vector, language="python")
-```
-
-Final verification before search.
-
----
-
-## 9️⃣ Integration with Day 19
+## 7️⃣ Integration with Day 19
 
 ```python
 st.session_state.embeddings_table = f"{database}.{schema}.{embedding_table}"
@@ -718,28 +789,28 @@ st.session_state.embeddings_database = database
 st.session_state.embeddings_schema = schema
 ```
 
-* 🔗 Seamless handoff
-* ⚙️ Zero configuration tomorrow
+### 📌 Explanation
+
+* 🔹 Stores embedding table reference
+* 🔹 Enables Day 19 Cortex Search creation
+* 🔹 Semantic search ready
 
 ---
 
-## 🧠 Final Mental Model (Memorize This)
+## 🎯 Final Result
 
-* Day 16 → **Text ingestion**
-* Day 17 → **Context‑safe chunking**
-* Day 18 → **Meaning → vectors**
-* Day 19 → **Semantic search**
-
-🔥 **Final brutal takeaway**:
-
-> Without embeddings, RAG is just SQL with confidence.
+When this code runs, you will have a complete embedding generation system that converts Day 17's text chunks into **768‑dimensional vectors**, saves them to Snowflake's **VECTOR** data type, and provides tools to verify the embeddings were created correctly. These vectors enable semantic search that understands meaning, not just exact word matches.
 
 ---
 
 ## 📚 Resources
 
-* Cortex `EMBED_TEXT_768`
+* Cortex `EMBED_TEXT_768` Function
+* Understanding Embeddings
 * Snowflake VECTOR Data Type
 * Vector Distance Functions
+
+
+
 
 
