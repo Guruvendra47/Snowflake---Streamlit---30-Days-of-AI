@@ -146,7 +146,7 @@ with st.chat_message("assistant"):
 
 # Add assistant response to state
 st.session_state.messages.append({"role": "assistant", "content": response})
-st.rerun()
+st.rerun()  # Force rerun to update sidebar stats
 ```
 
 ---
