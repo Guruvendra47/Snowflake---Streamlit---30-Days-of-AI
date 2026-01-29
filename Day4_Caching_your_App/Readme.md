@@ -1,19 +1,21 @@
-# 📅 Day 4  
-## 🗄️ Caching your App
+# 🗓️ Day 4 — Caching your App
 
-For today's challenge, our goal is to **create a Streamlit web application that calls a Snowflake Cortex Large Language Model (LLM)** ❄️🧠.  
+## 🧠 Goal of the Day
+
+For today's challenge, our goal is to create a **Streamlit web application** that calls a **Snowflake Cortex Large Language Model (LLM)**.
+
 We need to build an interface where a user can:
 
-- ✍️ Enter a prompt  
-- 🤖 Send it to a powerful AI model (like **Claude 3.5 Sonnet**) running securely inside Snowflake  
-- 📥 Get a response  
-- ⏱️ See how long the request took  
+* ✍️ Enter a prompt
+* 🚀 Send it to a powerful AI model (like **Claude 3.5 Sonnet**) running securely inside **Snowflake**
+* 📩 Get a response back
+* ⏱️ See how long the request took
 
-Once that's done, we will display the AI's answer directly in the web app.
+Once that's done, we will display the AI's answer directly in the web app, along with the execution time.
 
 ---
 
-## 🧪 Code:
+## 🧩 See the Code
 
 ```python
 import streamlit as st
@@ -57,16 +59,26 @@ if st.button("Submit"):
 # Footer
 st.divider()
 st.caption("Day 4: Caching your App | 30 Days of AI")
+```
+
 ---
-📖 Explanation
-🧩 How It Works: Step-by-Step
+
+## 📘 Explanation
+
+### 🔍 How It Works: Step‑by‑Step
+
 Let's break down what each part of the code does.
 
-1️⃣ Setup: Imports and Session
+---
+
+## 1️⃣ Setup: Imports and Session
+
+```python
 import streamlit as st
 import time
 import json
 from snowflake.snowpark.functions import ai_complete
+
 # Connect to Snowflake
 try:
     # Works in Streamlit in Snowflake
@@ -76,19 +88,22 @@ except:
     # Works locally and on Streamlit Community Cloud
     from snowflake.snowpark import Session
     session = Session.builder.configs(st.secrets["connections"]["snowflake"]).create()
-import ...: These lines import all the necessary libraries:
+```
 
-streamlit 🖥️ for the web app UI
+* 📦 `import ...`: These lines import all the necessary libraries:
 
-time ⏱️ to measure response speed
+  * **streamlit** → web app UI
+  * **time** → measure response speed
+  * **json** → parse the LLM's output
+  * **snowpark** → connect to Snowflake and use AI functions
 
-json 📦 to parse the LLM output
+* 🔁 **try / except block**: Automatically detects the environment and connects appropriately, working in all deployment scenarios
 
-Snowpark functions ❄️ to connect to Snowflake and call Cortex AI
+---
 
-try/except block: Automatically detects the environment and connects appropriately, working in all deployment scenarios
+## 2️⃣ Defining the Cortex LLM Call
 
-2️⃣ Defining the Cortex LLM Call
+```python
 @st.cache_data
 def call_cortex_llm(prompt_text):
     model = "claude-3-5-sonnet"
@@ -100,22 +115,34 @@ def call_cortex_llm(prompt_text):
     response_raw = df.collect()[0][0]
     response_json = json.loads(response_raw)
     return response_json
-@st.cache_data: ⭐ This is a Streamlit decorator that caches the function result
+```
 
-First call → LLM runs (3–5 seconds)
+* 🧠 `@st.cache_data`: This is a Streamlit **decorator** that cleverly saves the result of this function.
 
-Same prompt again → Instant response (< 0.1s)
+  * First time → calls the LLM (3–5 seconds)
+  * Same prompt again → instant response (< 0.1 sec)
+  * Change even **one character** → cache miss → LLM runs again
 
-Change even one character → Cache miss → LLM runs again
+* 🤖 `ai_complete(...)`: Core Snowpark function that securely calls the specified model (**Claude 3.5 Sonnet**) running in **Snowflake Cortex**
 
-ai_complete(...): Securely calls the specified model (Claude 3.5 Sonnet) inside Snowflake Cortex
+* 🧾 `df.collect()[0][0]`:
 
-df.collect()[0][0]: Executes the query and extracts the single returned value
+  * Executes the query
+  * Fetches one row and one column
+  * Returns a raw text string
 
-json.loads(response_raw): Parses the raw JSON text into a Python dictionary
+* 🔓 `json.loads(response_raw)`:
 
-3️⃣ Building the Web App Interface
+  * Parses the raw JSON string
+  * Converts it into a structured Python dictionary
+
+---
+
+## 3️⃣ Building the Web App Interface
+
+```python
 prompt = st.text_input("Enter your prompt", "Why is the sky blue?")
+
 if st.button("Submit"):
     start_time = time.time()
     response = call_cortex_llm(prompt)
@@ -123,24 +150,50 @@ if st.button("Submit"):
     
     st.success(f"*Call took {end_time - start_time:.2f} seconds*")
     st.write(response)
-st.text_input(...): Displays a text input box with a default prompt
+```
 
-st.button("Submit"): Runs the code only when the button is clicked
+* ✏️ `st.text_input(...)`: Draws a text input box with a label and default text
 
-start_time / end_time: Captures execution time
+* 🔘 `st.button("Submit")`:
 
-call_cortex_llm(prompt): Calls the cached LLM function
+  * Draws a button
+  * Code runs **only when clicked**
 
-st.success(...): Displays the execution time in a green success box ✅
+* ⏱️ `start_time` / `end_time`:
 
-st.write(response): Displays the full LLM response
+  * Capture execution time
 
-When this code runs, you will see a simple webpage with a text box and a button.
-After entering a prompt and clicking Submit, the LLM's response appears along with how long the call took.
+* 🔁 `call_cortex_llm(prompt)`:
 
-📚 Resources
-🔗 st.cache_data Documentation
+  * Sends user input to Cortex LLM
+  * Receives structured response
 
-🔗 Caching in Streamlit
+* ✅ `st.success(...)`:
 
-🔗 Streamlit in Snowflake (SiS) Caching Limitations
+  * Displays a green success box with elapsed time
+
+* 📄 `st.write(response)`:
+
+  * Displays the entire response dictionary
+
+---
+
+## 🖥️ Final Result
+
+When this code runs, you will see:
+
+* A simple webpage
+* A text box for input
+* A submit button
+* The LLM's response displayed below
+* The time taken for the request
+
+---
+
+## 📚 Resources
+
+* 📘 **st.cache_data Documentation**
+* 📘 **Caching in Streamlit**
+* 📘 **SiS Caching Limitations**
+
+
