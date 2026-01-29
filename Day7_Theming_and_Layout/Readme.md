@@ -168,7 +168,7 @@ with st.sidebar:
     word_count = st.slider("Approximate word count:", 50, 300, 100)
 ```
 
-* 📦 `with st.sidebar`: Moves widgets into a collapsible side panel
+* 📦 `with st.sidebar`: Moves widgets into a collapsible side panel and `:material_post:` Streamlit supports Material Design icons directly in strings. This adds a relevant icon next to the title without needing image files.
 * 🎯 Keeps the main area focused on input and output
 * 🖼️ Material icons enhance clarity without extra assets
 
