@@ -545,12 +545,12 @@ if st.button(":material_folder_open: Load Chunks", type="primary"):
     st.rerun()
 ```
 
-### 📌 Explanation (unchanged)
+### 📌 Explanation
 
-* 🔹 `from snowflake.cortex import embed_text_768`: Imports the Cortex function that generates **768‑dimensional embeddings**.
-* 🔹 **Session state integration**: Automatically detects the chunk table location from Day 17's `chunks_database` and `chunks_schema`.
-* 🔹 **Load button**: Queries all chunks from Day 17's table using `SELECT`.
-* 🔹 `st.rerun()`: Forces an immediate refresh to display the loaded chunks.
+* `from snowflake.cortex import embed_text_768`: Imports the Cortex function that generates **768‑dimensional embeddings**.
+* **Session state integration**: Automatically detects the chunk table location from Day 17's `chunks_database` and `chunks_schema`.
+* **Load button**: Queries all chunks from Day 17's table using `SELECT`.
+* `st.rerun()`: Forces an immediate refresh to display the loaded chunks.
 
 ---
 
@@ -588,11 +588,11 @@ if st.button(":material_calculate: Generate Embeddings", type="primary"):
 
 ### 📌 Explanation
 
-* 🔹 **Batch size selection**: Lets users process chunks in batches of 10, 25, 50, or 100 for better performance control.
-* 🔹 **Progress tracking**: Creates a progress bar and status text to show processing status in real‑time.
-* 🔹 `embed_text_768(...)`: Core Cortex function converting text into a **768‑dimensional vector** using `snowflake-arctic-embed-m`.
-* 🔹 **Embedding structure**: Returns a list of 768 floating‑point numbers representing semantic meaning.
-* 🔹 **Storage**: Embeddings are stored in session state as `{chunk_id, embedding}`.
+* **Batch size selection**: Lets users process chunks in batches of 10, 25, 50, or 100 for better performance control.
+* **Progress tracking**: Creates a progress bar and status text to show processing status in real‑time.
+* `embed_text_768(...)`: Core Cortex function converting text into a **768‑dimensional vector** using `snowflake-arctic-embed-m`.
+* **Embedding structure**: Returns a list of 768 floating‑point numbers representing semantic meaning.
+* **Storage**: Embeddings are stored in session state as `{chunk_id, embedding}`.
 
 ---
 
@@ -620,10 +620,10 @@ if 'embeddings_data' in st.session_state:
 
 ### 📌 Explanation 
 
-* 🔹 Container structure wraps the preview section.
-* 🔹 Metrics confirm embedding count and dimensionality.
-* 🔹 Sample preview shows the first 10 vector values.
-* 🔹 Verification ensures embeddings exist **before saving**.
+* Container structure wraps the preview section.
+* Metrics confirm embedding count and dimensionality.
+* Sample preview shows the first 10 vector values.
+* Verification ensures embeddings exist **before saving**.
 
 ---
 
@@ -652,9 +652,9 @@ except:
 
 ### 📌 Explanation 
 
-* 🔹 Checks whether the embeddings table exists.
-* 🔹 Displays record count if present.
-* 🔹 Drives **Replace vs Append** behavior.
+* Checks whether the embeddings table exists.
+* Displays record count if present.
+* Drives **Replace vs Append** behavior.
 
 ---
 
@@ -700,8 +700,8 @@ with st.container(border=True):
 
 ### 📌 Explanation
 
-* 🔹 Self‑distance must always be **0**.
-* 🔹 Confirms embeddings are stored correctly.
+* Self‑distance must always be **0**.
+* Confirms embeddings are stored correctly.
 
 ---
 
@@ -775,9 +775,9 @@ if 'queried_embeddings' in st.session_state:
 ### 📌 Explanation
 
 * 🔹 Select CHUNK_ID
-* 🔹 Load full 768‑dimension vector
-* 🔹 Handles string, list, and numpy formats
-* 🔹 Displays readable Python list
+* Load full 768‑dimension vector
+* Handles string, list, and numpy formats
+* Displays readable Python list
 
 ---
 
@@ -791,9 +791,9 @@ st.session_state.embeddings_schema = schema
 
 ### 📌 Explanation
 
-* 🔹 Stores embedding table reference
-* 🔹 Enables Day 19 Cortex Search creation
-* 🔹 Semantic search ready
+* Stores embedding table reference
+* Enables Day 19 Cortex Search creation
+* Semantic search ready
 
 ---
 
