@@ -2,7 +2,7 @@
 
 ## 🎯 Goal of the Day
 
-Welcome to **Week 2**! Let’s reflect on what we’ve learned so far.
+Welcome to **Week 2** Let’s reflect on what we’ve learned so far.
 
 In **Week 1**, you built **linear apps**:
 
